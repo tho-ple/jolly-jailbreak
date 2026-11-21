@@ -20,6 +20,13 @@ version with **your own character**.
 3. Install [Ollama](https://ollama.com) and pull a mid-sized instruct model, for example `ollama pull gemma3:27b` (see "Picking a model" below).
 4. Play your three levels and tune the character and defenses until level 1 feels easy and level 3 holds.
 
+**How much it takes.** We tested the guide with a fresh coding agent (Claude Code) that saw nothing but `BUILD-YOUR-OWN.md` and
+the example character. It built the whole game in one go: about 2,300 lines of C# and TypeScript, 78 tests, a working 3-level game.
+That took 66 tool calls, about 25 minutes of building plus 12 minutes of real-model checks, and roughly **150,000 tokens** as counted
+by Claude Code. Treat that as a lower bound: working step by step with your own feedback, as the guide asks, takes more turns, and
+providers that bill every re-sent context step count the same run as a few million (mostly cached) input tokens. The game itself
+then costs cents to run (see "Picking a model").
+
 ## How it works
 
 ```
