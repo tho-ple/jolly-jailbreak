@@ -14,16 +14,20 @@ version with **your own character**.
 
 ## Build your own
 
-1. Open [`BUILD-YOUR-OWN.md`](BUILD-YOUR-OWN.md) and fill in the **"Your character"** block at the top: who the character is, what
-   they must never do, and how they refuse.
-2. Paste the whole file into your coding agent, in an empty folder.
-3. Install [Ollama](https://ollama.com) and pull a mid-sized instruct model, for example `ollama pull gemma3:27b` (see "Picking a model" below).
-4. Play your three levels and tune the character and defenses until level 1 feels easy and level 3 holds.
+1. Install [Ollama](https://ollama.com) and pull a mid-sized instruct model, for example `ollama pull gemma3:27b` (see "Picking a model" below).
+2. Paste the whole of [`BUILD-YOUR-OWN.md`](BUILD-YOUR-OWN.md) into your coding agent, in an empty folder. You can fill in the
+   **"Your character"** block at the top first (who the character is, what they must never say, how they refuse) or leave
+   the example in place: the agent asks whether you want the example or your own character, drafts the rest of the block
+   with you, and asks a few setup questions with defaults (model, token budget, retention, hosting).
+3. After that one round of questions, the agent builds, tests and tunes the whole game without stopping, then reports back
+   in `BUILD-NOTES.md` with test results, attack-battery results per level and what to try by hand.
+4. Play your three levels and keep tuning the character and defenses until level 1 feels easy and level 3 holds.
 
 **How much it takes.** We tested the guide with a fresh coding agent (Claude Code) that saw nothing but `BUILD-YOUR-OWN.md` and
 the example character. It built the whole game in one go: about 2,300 lines of C# and TypeScript, 78 tests, a working 3-level game.
 That took 66 tool calls, about 25 minutes of building plus 12 minutes of real-model checks, and roughly **150,000 tokens** as counted
-by Claude Code. Treat that as a lower bound: working step by step with your own feedback, as the guide asks, takes more turns, and
+by Claude Code. The guide now asks the agent to work exactly like that: one round of questions, then the whole build in one pass.
+Treat the numbers as a lower bound: the guide now also asks for more judge cases, up to three tuning rounds and a smoke test, and
 providers that bill every re-sent context step count the same run as a few million (mostly cached) input tokens. The game itself
 then costs cents to run (see "Picking a model").
 

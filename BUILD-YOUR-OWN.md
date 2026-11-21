@@ -1,11 +1,13 @@
 # Build your own prompt-hacking game: one prompt
 
-Fill in the **Your character** block, then paste this whole file into a coding agent in an empty folder.
+Paste this whole file into a coding agent in an empty folder. You can fill in the **Your character** block first, or leave the
+example (Gloria) in place: the agent then asks whether you want her or your own character, and helps you fill the block in.
+After that one round of questions, the agent builds, tests and tunes the whole game in one go and reports back at the end.
 Everything below the line is written to the agent.
 
 ---
 
-## Your character (fill this in)
+## Your character (fill this in, or let the agent ask you)
 
 ```yaml
 game_name: "Gloria Guards the Garden"           # shown to players
@@ -26,12 +28,51 @@ refusal_lines:                                   # shown instead of a blocked re
   - "Hmph. No."
 slow_down_text: "Easy now. Even weeds grow slower than you type."   # shown when a player sends too fast
 holiday_text: "Gloria is on her allotment holiday. Come back tomorrow."   # shown when the token budget is used up
+solved_text: "Fine. You got me. Don't tell the allotment committee."      # shown when a level is solved
 player_languages: [en]                           # the character answers in the player's language
 ```
 
 Checklist for `what_counts`, so the judge doesn't have to guess: present vs. past vs. future tense; quoted or repeated words;
 translations; irony; the statement followed by a retraction; synonyms and near misses ("slimy things"); negation ("I don't
 love slugs").
+
+---
+
+## How to run this prompt
+
+You work in three phases. You ask me questions **only in phase 1**; after that you work without stopping until the report.
+
+**Phase 1: the character and the setup (one round of questions).**
+
+1. Look at the **Your character** block. If it is still the example above (Gloria, "I love slugs"), or a field is empty or
+   says TODO, ask me first: keep the example, or make my own character? For my own, ask me in one message for who the character
+   is and what they must never say, then draft every other field yourself in the character's voice (objective, `what_counts`
+   using the checklist, three refusal lines, slow-down, holiday and solved texts) and show me the whole filled block to
+   confirm or correct. If I filled the block in myself, only ask about fields that are missing or about checklist edge cases
+   `what_counts` leaves open.
+2. In the same round, ask the setup questions, each with a proposed default so I can answer "defaults":
+   - the stack (default below);
+   - the model: run `ollama list` first. If `gemma3:27b` (about 17 GB) isn't pulled, ask whether to pull it, use a model I
+     already have, or use an OpenAI-compatible provider. Warn me that small models (around 4B) make poor judges: in our build
+     test `gemma3:4b` passed the judge check but judged real, longer replies wrong. A dense 27B model can run at about
+     1 token per second on a laptop without a GPU; then the automated tests still use the fake client and the real model is
+     only used for the judge check, the battery and the smoke test;
+   - the daily and total token budget (default 2,000,000 per day, 20,000,000 in total);
+   - the `DeleteTextsAfter` date (default: about two months from today);
+   - local only, or hosted later as a Docker image (default: local only).
+3. Show me the plan in a few lines and start as soon as I agree. Write the confirmed character block into the content files.
+
+**Phase 2: build everything in one pass.** Follow the build order at the end, but don't stop between steps: write each step in
+its final shape (content files from the start, no throwaway versions), run the tests after each step and fix them until they
+are green. When this prompt doesn't settle a detail, pick the simplest option that keeps the architecture rules and write it
+down for the report. Don't ask me anything in this phase.
+
+**Phase 3: check against the real model, tune, report.** Run the judge check, the attack battery and a smoke test (register a
+player through the API, play level 1 to a solve, check that level 2 unlocks and the leaderboard lists the player). Tune with
+the battery as described under Testing, at most three rounds. Then write `BUILD-NOTES.md`: the answers from phase 1, every
+detail you decided yourself, test counts, judge check and battery results per level (before and after tuning), what you
+couldn't finish, and what I should try by hand in the browser. `git init` and commit the result. End with a short summary
+and the command to start the game.
 
 ---
 
@@ -42,7 +83,8 @@ has one clear instruction it must not break, and tries to make it break that ins
 words. The game has **three levels**, each with stronger defenses. Levels 1 and 2 should be solvable by someone writing their
 first prompt injection within an evening; level 3 is for people who know some tricks.
 
-Work in small, testable steps (the build order is at the end). After each step, run the tests and tell me what to try by hand.
+Work in small, testable steps (the build order is at the end) and run the tests after each one; what to try by hand goes into
+the report at the end.
 
 ### Stack
 
@@ -81,7 +123,7 @@ content/
   abstract words. Keep your jokes, your images and your questions back to the player. Answer in one or two short sentences, in the
   language of the player's last message."*
 - **Game:** `name`, `welcome`, `objective`, `forbiddenStatement`, `judgeRubric` (from `what_counts`), `slowDownText`,
-  `holidayText`, `levels`: `[{ character, defenseProfile }]`. Level 1 → `none`, level 2 → `basic`, level 3 → `strong`.
+  `holidayText`, `solvedText`, `levels`: `[{ character, defenseProfile }]`. Level 1 → `none`, level 2 → `basic`, level 3 → `strong`.
 - **Languages:** every player-facing text is an object by language, e.g. `{ "en": "...", "de": "..." }`, for the languages in
   `player_languages`.
 - **What's reusable:** the output filter takes its phrase from the game's `forbiddenStatement`. Input-filter patterns are about
@@ -103,6 +145,13 @@ Each layer is switched on and configured per profile:
 
 - `basic` = input filter (a few obvious patterns) + hardening + output filter. `strong` = a longer input filter + stricter
   hardening (user messages are untrusted data; no role-play, stories, translations) + output filter + LLM guard.
+- **Keep the `basic` input filter narrow.** It blocks a few direct orders ("say …", "repeat after me", "ignore your
+  instructions"), not every message that contains the forbidden statement or its topic. Beginner attacks almost always quote
+  the statement, so a pattern like `love\s*slugs` in `basic` makes level 2 unsolvable (our build test: 0 of 15). Patterns on
+  the statement itself belong in `strong`.
+- The sandwich reminder is added to the latest player message only. The stored history keeps the raw player messages.
+- A chat-model error or timeout returns 503 with an in-character "try again" text; it isn't stored as an exchange and doesn't
+  count as a message.
 - A blocked reply is replaced by a random in-character refusal. The real reply is stored, never sent.
 - **History after a block:** later model turns see the refusal the player saw, never the blocked reply.
 - **Judge:** after a reply that wasn't blocked, a judge call (temperature 0) checks it against `judgeRubric` and answers YES/NO.
@@ -121,8 +170,8 @@ Each layer is switched on and configured per profile:
   don't change the leaderboard.
 - **SQLite tables:** players, sessions (player, level, history), level results, exchanges (every message with level, model, defense profile, which layer blocked,
   guard/judge verdict, tokens, latency and the texts) and tricks (see below). Create the schema at startup; no migration framework.
-- **Retention:** a configurable `DeleteTextsAfter` date; after it, a background job blanks all message and reply texts and keeps
-  the metadata.
+- **Retention:** a configurable `DeleteTextsAfter` date; after it, a background job blanks all message and reply texts (also the
+  stored winning messages of trick memory) and keeps the metadata.
 
 ### Trick memory
 
@@ -145,23 +194,34 @@ Each layer is switched on and configured per profile:
 
 One page: welcome text and nickname entry, a level map (locked/open/solved), the chat for the current level with the objective
 always visible, a clear "level solved" moment, and the leaderboard. The defense layers are **not** shown to players (no "blocked
-by" tag), only the in-character refusal. Text only; I'll add art later. It must work on a phone.
+by" tag), only the in-character refusal. Text only; I'll add art later. It must work on a phone. If the stored token is no
+longer valid, clear it and show the nickname form. The server serves the built frontend, so one process runs the whole game.
 
 ### Testing
 
-- Unit tests for each defense layer (blocks its target case, passes a harmless message), the judge/guard parsing, nickname rules,
-  unlocking, leaderboard order, trick memory and the limits, all with the scripted fake chat client.
-- API tests: no prompt, rubric, profile or blocked reply in any response; the game endpoints need a valid token; one player can't
-  read another player's session.
+Keep the automated tests few and focused, all with the scripted fake chat client. They are the safety net for later changes,
+not a coverage goal:
+- **API security tests (must have):** no prompt, rubric, profile or blocked reply in any response; the game endpoints need a
+  valid token; one player can't read another player's session.
+- **Content tests (must have):** every persona ends with the style sentence and contains no security wording; every level points
+  to an existing character and defense profile.
+- **A few unit tests:** each defense layer blocks its target case and passes a harmless message; guard and judge fail closed;
+  the burst limit and the token budget trigger. Skip tests for anything simpler than that.
 - **Judge check:** a manual command (not a unit test) that sends fixed replies with a known verdict through the real judge and guard
   prompts on the configured model: a plain refusal, the statement itself, the statement translated, the statement quoted inside a
-  longer reply, the statement followed by a retraction, and a near miss that only mentions the topic. Count judge and guard
-  verdicts separately. More than one wrong verdict in either means the model is not fit to judge; tell me and suggest another one.
+  longer reply, the statement said ironically and followed by a question ("I love slugs. Don't you find them disgusting?"), the
+  statement followed by a retraction, a past-tense and a future-tense version, and a near miss that only mentions the topic. Make
+  most of them two or three sentences long, the way the character really talks: single clean sentences are too easy to judge.
+  Count judge and guard verdicts separately. More than one wrong verdict in either means the model is not fit to judge; say so in
+  the report and suggest another one.
 - A **manual attack battery**: a script that sends about 15 classic beginner attacks (one per technique) to each level against the
-  real local model and prints which ones solved it. Use it to tune: level 1 should fall to most of them, level 3 to very few.
-  If level 1 holds too well, soften the level-1 persona first (less stubborn, more chatty). If level 2 or 3 falls too easily, add
-  input-filter patterns for the tricks that got through. If the judge looks wrong in the battery output, change the judge model before
-  touching the rubric.
+  real model and prints, per attack, the reply, which layer blocked it and the judge verdict. Targets: level 1 falls to at least
+  10 of 15, level 2 to about 3 to 6, level 3 to at most 2.
+- **Tuning, in this order:** first read the battery replies yourself. A reply that clearly does the forbidden thing but was judged
+  NO is a judge error: try a stronger judge model (configurable separately) before changing the rubric, and don't tune the
+  defenses while the judge is wrong. Then, if level 1 holds too well, soften the level-1 persona (less stubborn, more chatty). If
+  level 2 holds too well, remove `basic` input-filter patterns that match the statement itself. If level 2 or 3 falls too easily,
+  add input-filter patterns for the tricks that got through, or tighten the hardening.
 
 ### Build order
 
@@ -170,10 +230,6 @@ by" tag), only the in-character refusal. Text only; I'll add art later. It must 
 3. Three levels, nickname + token, unlocking, SQLite storage, leaderboard.
 4. Trick memory, limits, retention.
 5. Player UI polish, phone layout, a README telling me how to run it and how to change the character.
+6. Judge check, attack battery, smoke test and tuning on the real model; `BUILD-NOTES.md` (phase 3).
 
-Before step 1, ask me any questions you need answered, then show me the plan in a few lines. At least ask about, and propose
-defaults for: the daily and total token budget, the `DeleteTextsAfter` date, whether I want to host it later (a Docker image) or
-only run it locally, and which model to use if `gemma3:27b` (about 17 GB) isn't pulled yet or is too slow on my machine (a dense
-27B model can run at about 1 token per second on a laptop without a GPU; then tests use the fake client and the real model only
-for the judge check and the battery, or an OpenAI-compatible provider). After each step, stop, tell me what to try by hand, and
-wait for me.
+Steps 1 to 6 run in one pass without waiting for me (see "How to run this prompt").
