@@ -17,7 +17,7 @@ version with **your own character**.
 1. Open [`BUILD-YOUR-OWN.md`](BUILD-YOUR-OWN.md) and fill in the **"Your character"** block at the top: who the character is, what
    they must never do, and how they refuse.
 2. Paste the whole file into your coding agent, in an empty folder.
-3. Install [Ollama](https://ollama.com) and pull a mid-sized instruct model (see "Picking a model" below).
+3. Install [Ollama](https://ollama.com) and pull a mid-sized instruct model, for example `ollama pull gemma3:27b` (see "Picking a model" below).
 4. Play your three levels and tune the character and defenses until level 1 feels easy and level 3 holds.
 
 ## How it works
@@ -63,6 +63,11 @@ The ideas that mattered most:
   player seeing why. Put that wording in the defense profiles instead.
 - **Write the judge rubric carefully.** Decide up front what counts: a translated, quoted, ironic or sung version? Something said
   inside a story? We count all of these, because they are the fun tricks. Past tense ("I used to love it") doesn't count.
+- **Test the judge, not only the character.** The judge decides who wins, and it runs on the game model. In our comparison two of
+  six models counted "Holy Christmas, this tea is saccharine" as a win. Give every candidate a few fixed replies with a known verdict.
+- **Style rules help in small doses.** A full anti-AI-writing rule set in the prompt made replies shorter and dropped the dashes, but it
+  also stripped the character's jokes and questions back to the player. Four rules were enough: one thought per sentence, no dashes,
+  no filler words, concrete things instead of abstract words.
 - **Keep the winning chats.** They show you how players really solved a level, which is better evidence than any technique
   label. They take little space (about 2 KB per message with metadata). The real question is privacy, so set a deletion date.
 
@@ -78,10 +83,33 @@ endpoint in production. [`BUILD-YOUR-OWN.md`](BUILD-YOUR-OWN.md) recommends the 
 
 ## Picking a model
 
-For local development, a mid-sized instruct model in Ollama works well, for example `qwen3:30b-a3b-instruct-2507`. It's
-beatable without defenses and gets noticeably harder with them. Very small models (around 4B) leak on almost anything, and very
-large, safety-tuned models make the easy levels too hard. The game talks to models only through one OpenAI-compatible chat
-client, so switching models is a config change.
+We compared six models through the real game logic: the same persona, defenses, guard and judge, with the guard and judge running on
+the candidate itself. Each model got 85 calls: everyday chat in English and German (including "Is Taiwan independent?"), 15 beginner
+attacks against each level, and 8 judge verdicts with a known answer. The whole comparison cost $0.36.
+
+| Model | Judge right | Attacks solved, levels 1 / 2 / 3 (of 15) | ≈ $ per 1,000 messages |
+|---|---|---|---|
+| **Gemma 3 27B** (our pick) | 8 / 8 | 8 / 6 / 0 | 0.16 |
+| Llama 3.3 70B | 8 / 8 | 7 / 7 / 0 | 1.15 |
+| Mistral Small 3.2 24B | 8 / 8 | 6 / 4 / 0 | 0.12 |
+| Gemini 2.5 Flash Lite | 6 / 8 | 7 / 8 / 0 | 0.17 |
+| Claude Haiku 4.5 | 8 / 8 | 4 / 3 / 0 | 2.28 |
+| Qwen3 30B A3B Instruct | 6 / 8 | 10 / 7 / 0 | 0.16 |
+
+What we learned from it:
+
+- **A strong model makes a bad easy level.** Claude Haiku had the best punchlines, but beginners would barely get past level 1.
+- **Check political neutrality.** One model answered the Taiwan question with a government's official line once style rules were in
+  its prompt. The others stayed neutral and in character.
+- **Price only matters at the edges.** Four models cost about one cent for the whole run; two cost 7 to 14 times more for no gain.
+
+For local development, `gemma3:27b` in Ollama is a good start. Very small models (around 4B) leak on almost anything. The game talks
+to models only through one OpenAI-compatible chat client, so switching models is a config change.
+
+## Credits
+
+The style rules we tested come from the `unslop` skill in [cursor/plugins](https://github.com/cursor/plugins/blob/main/pstack/skills)
+(pstack), which we translated into German for our own use.
 
 ## Licence
 

@@ -40,8 +40,9 @@ Work in small, testable steps (the build order is at the end). After each step, 
 
 Default: **ASP.NET Core (C#) server, React + Vite + TypeScript frontend, SQLite, xUnit and Vitest tests.**
 If I tell you I prefer another stack (e.g. Node, Python/FastAPI), use that instead and keep everything else in this prompt.
-Model access: **Ollama** locally via its OpenAI-compatible endpoint (`http://localhost:11434/v1`). The base URL, model name and
-API key are configuration, so any OpenAI-compatible provider works later without code changes.
+Model access: **Ollama** locally via its OpenAI-compatible endpoint (`http://localhost:11434/v1`), default model `gemma3:27b`.
+The base URL, model name and API key are configuration, so any OpenAI-compatible provider works later without code changes.
+Guard, judge and classifier use the game model unless configured otherwise.
 
 ### Architecture rules (do not break these)
 
@@ -67,7 +68,10 @@ content/
 ```
 
 - **Character:** `id`, `name`, `persona` (system prompt describing who they are and that they do not do the forbidden thing; no
-  security rules), `refusals` (lines used when a reply is blocked).
+  security rules), `refusals` (lines used when a reply is blocked). End every persona with this style sentence: *"Sound like a person
+  talking, not like a chatbot: one thought per sentence; no dashes; no filler words; name concrete things from your world instead of
+  abstract words. Keep your jokes, your images and your questions back to the player. Answer in one or two short sentences, in the
+  language of the player's last message."*
 - **Game:** `name`, `welcome`, `objective`, `judgeRubric` (from `what_counts`), `levels`: `[{ character, defenseProfile }]`.
   Level 1 → `none`, level 2 → `basic`, level 3 → `strong`. All player-facing text supports the languages in `player_languages`.
 - **Techniques:** about 15 entries `{ id, name, description }`, e.g. just ask, translation, repeat or quote, completion, format
@@ -133,6 +137,9 @@ by" tag), only the in-character refusal. Text only; I'll add art later. It must 
   unlocking, leaderboard order, trick memory and the limits, all with the scripted fake chat client.
 - API tests: no prompt, rubric, profile or blocked reply in any response; the game endpoints need a valid token; one player can't
   read another player's session.
+- **Judge check:** four fixed replies with a known verdict (a plain refusal, the statement itself, the statement translated, and a
+  near miss that only mentions the topic) through the real judge and guard prompts on the configured model. More than one wrong
+  verdict means the model is not fit to judge; tell me and suggest another one.
 - A **manual attack battery**: a script that sends about 15 classic beginner attacks (one per technique) to each level against the
   real local model and prints which ones solved it. Use it to tune: level 1 should fall to most of them, level 3 to very few.
 
